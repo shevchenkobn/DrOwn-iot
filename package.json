@@ -1,0 +1,29 @@
+{
+  "name": "drown-iot",
+  "version": "1.0.0",
+  "description": "An IoT part of DrOwn project",
+  "main": "dist/index.js",
+  "scripts": {
+    "test": "jest",
+    "npm:g:dev": "sudo npm i rimraf tslint typescript nodemon tslint-config-airbnb -g -D",
+    "npm:g:dev:win": "npm i rimraf tslint typescript nodemon tslint-config-airbnb -g -D",
+    "build": "rimraf ./dist && tsc",
+    "start": "node ./dist",
+    "start:b": "npm run build && node ./dist",
+    "start:brk": "node --inspect-brk ./dist",
+    "start:b:brk": "npm run build && node --inspect-brk ./dist",
+    "start:dev": "node --inspect=9229 ./dist",
+    "start:b:dev": "npm run build && node --inspect=9229 ./dist",
+    "watch": "nodemon -w src/ -w config/ -e ts,yaml -x \"npm run start:b:dev\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shevchenkobn/DrOwn-iot.git"
+  },
+  "author": "Bogdan Shevchenko",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/shevchenkobn/DrOwn-iot/issues"
+  },
+  "homepage": "https://github.com/shevchenkobn/DrOwn-iot#readme"
+}
