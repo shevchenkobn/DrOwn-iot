@@ -20,7 +20,7 @@
     "inlineSources": false,
     "isolatedModules": false,
     "keyofStringsOnly": false,
-    "lib": ["esnext", "es6"],
+    "lib": ["esnext"],
     "listEmittedFiles": true,
     "maxNodeModuleJsDepth": 0,
     "module": "commonjs",
@@ -49,6 +49,6 @@
     "suppressImplicitAnyIndexErrors": false,
     "target": "esnext",
     "typeRoots": ["@types"],
-//    "types": ["reflect-metadata"]
+    "types": ["node"]
   }
 }

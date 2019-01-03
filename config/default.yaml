@@ -1,0 +1,3 @@
+passwordPath: .password
+snapshotPath: default-drone.yaml
+reportPeriod: 3000

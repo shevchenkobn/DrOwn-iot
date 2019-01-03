@@ -1,14 +1,10 @@
 #!/usr/bin/node
-import * as yargs from 'yargs';
+import { bootstrap } from './main/bootstrapper';
+import { parseArgs } from './services/arg-parser.service';
 
-const argv = yargs
-  .usage('Run it to emulate delivery drone')
-  .version().alias('v', 'version')
-  .help('help').alias('h', 'help')
-  .option('url', {
-    alias: 'u',
-    string: true,
-    demandOption: true,
-    description: 'Path to url of the server',
-  })
-  .argv;
+const argv = parseArgs();
+
+bootstrap(argv).catch(err => {
+  console.error(err);
+  process.emit('SIGINT', 'SIGINT');
+});
