@@ -38,7 +38,7 @@ class TelemetryUpdaterService {
                     this.stop();
                 }
             };
-            util_service_1.bindCallbackOnExit(this._onClose);
+            util_service_1.bindOnExitHandler(this._onClose);
         }
     }
     stop() {

@@ -4,9 +4,17 @@ import { IConfigGetter } from './config-loader.service';
 import { promises as fs, constants as fsConst } from 'fs';
 import * as path from 'path';
 import * as yaml from 'js-yaml';
-import { bindCallbackOnExit } from './util.service';
+import { bindOnExitHandler } from './util.service';
 import { TelemetryUpdaterService } from './telemetry-updater.service';
 import { EventEmitter } from 'events';
+import { DroneOrderStatus } from '../actions';
+
+export enum DroneStatus {
+  WAITING = 0,
+  TAKING_CARGO = 1,
+  RELEASING_CARGO = 2,
+  MOVING = 3,
+}
 
 export interface IDroneState extends EventEmitter {
   readonly connected: boolean;
@@ -22,6 +30,8 @@ export interface IDroneState extends EventEmitter {
   getLoad(): Promise<number>;
 
   getDeviceId(): Promise<string>;
+
+  getStatus(): Promise<DroneStatus>;
 
   getPassword(): Promise<string>;
 
@@ -54,6 +64,7 @@ export enum DisconnectReason {
 
 export class InMemoryDroneState extends EventEmitter implements IDroneState {
   private _deviceId!: string;
+  private _status!: DroneStatus;
   private _enginePower!: number;
   private _batteryPower!: number;
   private _loadCapacity!: number;
@@ -73,6 +84,13 @@ export class InMemoryDroneState extends EventEmitter implements IDroneState {
 
   get connected() {
     return this._connected;
+  }
+
+  set status(value: DroneStatus) {
+    if (typeof value === 'number' && DroneStatus[value]) {
+      throw new TypeError(`Bad status value ${value}`);
+    }
+    this._status = value;
   }
 
   set latitude(value: number) {
@@ -134,6 +152,7 @@ export class InMemoryDroneState extends EventEmitter implements IDroneState {
       throw new TypeError(`Device ID is bad ${snapshot.deviceId}`);
     }
     this._deviceId = snapshot.deviceId;
+    this._status = DroneStatus.WAITING;
 
     if (!isLongitude(snapshot.baseLongitude)) {
       throw new TypeError(`Base longitude is bad ${snapshot.baseLongitude}`);
@@ -188,7 +207,7 @@ export class InMemoryDroneState extends EventEmitter implements IDroneState {
 
     if (!this._closeCallback) {
       this._closeCallback = () => this.disconnect();
-      bindCallbackOnExit(this._closeCallback);
+      bindOnExitHandler(this._closeCallback);
     }
     this._connected = true;
     this._updater.start();
@@ -228,6 +247,13 @@ export class InMemoryDroneState extends EventEmitter implements IDroneState {
       await this.connect();
     }
     return Promise.resolve(this._deviceId);
+  }
+
+  public async getStatus(): Promise<DroneStatus> {
+    if (!this._connected) {
+      await this.connect();
+    }
+    return Promise.resolve(this._status);
   }
 
   public async hasPassword(): Promise<boolean> {

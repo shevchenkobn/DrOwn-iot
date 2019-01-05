@@ -1,5 +1,5 @@
 import { DisconnectReason, InMemoryDroneState } from './drone-state.service';
-import { bindCallbackOnExit } from './util.service';
+import { bindOnExitHandler } from './util.service';
 
 export class TelemetryUpdaterService {
   public static readonly INTERVAL = 1000;
@@ -56,7 +56,7 @@ export class TelemetryUpdaterService {
           this.stop();
         }
       };
-      bindCallbackOnExit(this._onClose);
+      bindOnExitHandler(this._onClose);
     }
   }
 

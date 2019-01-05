@@ -71,7 +71,7 @@ class QueueManager {
             this._onExit = () => {
                 this.stop();
             };
-            util_service_1.bindCallbackOnExit(this._onExit);
+            util_service_1.bindOnExitHandler(this._onExit);
         }
     }
     async runQueue() {

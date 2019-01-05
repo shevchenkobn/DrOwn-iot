@@ -6,6 +6,13 @@ const yaml = require("js-yaml");
 const util_service_1 = require("./util.service");
 const telemetry_updater_service_1 = require("./telemetry-updater.service");
 const events_1 = require("events");
+var DroneStatus;
+(function (DroneStatus) {
+    DroneStatus[DroneStatus["WAITING"] = 0] = "WAITING";
+    DroneStatus[DroneStatus["TAKING_CARGO"] = 1] = "TAKING_CARGO";
+    DroneStatus[DroneStatus["RELEASING_CARGO"] = 2] = "RELEASING_CARGO";
+    DroneStatus[DroneStatus["MOVING"] = 3] = "MOVING";
+})(DroneStatus = exports.DroneStatus || (exports.DroneStatus = {}));
 var DisconnectReason;
 (function (DisconnectReason) {
     DisconnectReason[DisconnectReason["BATTERY_CHARGE"] = 0] = "BATTERY_CHARGE";
@@ -13,6 +20,12 @@ var DisconnectReason;
 class InMemoryDroneState extends events_1.EventEmitter {
     get connected() {
         return this._connected;
+    }
+    set status(value) {
+        if (typeof value === 'number' && DroneStatus[value]) {
+            throw new TypeError(`Bad status value ${value}`);
+        }
+        this._status = value;
     }
     set latitude(value) {
         if (!isLatitude(value)) {
@@ -68,6 +81,7 @@ class InMemoryDroneState extends events_1.EventEmitter {
             throw new TypeError(`Device ID is bad ${snapshot.deviceId}`);
         }
         this._deviceId = snapshot.deviceId;
+        this._status = DroneStatus.WAITING;
         if (!isLongitude(snapshot.baseLongitude)) {
             throw new TypeError(`Base longitude is bad ${snapshot.baseLongitude}`);
         }
@@ -122,7 +136,7 @@ class InMemoryDroneState extends events_1.EventEmitter {
         }
         if (!this._closeCallback) {
             this._closeCallback = () => this.disconnect();
-            util_service_1.bindCallbackOnExit(this._closeCallback);
+            util_service_1.bindOnExitHandler(this._closeCallback);
         }
         this._connected = true;
         this._updater.start();
@@ -160,6 +174,12 @@ class InMemoryDroneState extends events_1.EventEmitter {
             await this.connect();
         }
         return Promise.resolve(this._deviceId);
+    }
+    async getStatus() {
+        if (!this._connected) {
+            await this.connect();
+        }
+        return Promise.resolve(this._status);
     }
     async hasPassword() {
         if (!this._connected) {

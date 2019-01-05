@@ -6,7 +6,7 @@ import {
   getActions,
   IDroneAction,
 } from '../actions';
-import { bindCallbackOnExit } from '../services/util.service';
+import { bindOnExitHandler } from '../services/util.service';
 import Socket = SocketIOClient.Socket;
 
 export interface IOrderInfo {
@@ -128,7 +128,7 @@ export class QueueManager implements IOrderQueue {
       this._onExit = () => {
         this.stop();
       };
-      bindCallbackOnExit(this._onExit);
+      bindOnExitHandler(this._onExit);
     }
   }
 

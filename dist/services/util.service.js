@@ -1,26 +1,56 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-function bindCallbackOnExit(callback) {
-    const events = ['SIGTERM', 'SIGINT', 'SIGQUIT'];
-    const handlers = events.map(signal => [
-        signal,
-        (...args) => {
-            callback(...args);
-            for (const [event, handler] of handlers) {
-                process.removeListener(event, handler);
-            }
-            process.emit(signal, signal);
-        },
-    ]);
-    handlers.push(['beforeExit', (...args) => {
-            callback(...args);
-            for (const [event, handler] of handlers) {
-                process.removeListener(event, handler);
-            }
-        }]);
-    for (const [event, handler] of handlers) {
-        process.once(event, handler);
+const handlers = [];
+const signals = ['SIGTERM', 'SIGINT', 'SIGQUIT'];
+function bindOnExitHandler(handler) {
+    if (handlers.length === 0) {
+        const cb = (...args) => {
+            execHandlers(args);
+            process.removeListener('beforeExit', cb);
+        };
+        process.once('beforeExit', cb);
+        for (const signal of signals) {
+            const cb = (...args) => {
+                execHandlers(args);
+                removeHandlers(cb);
+                setTimeout(() => process.exit(0), 1000);
+            };
+            process.once(signal, cb);
+        }
+    }
+    handlers.push(handler);
+}
+exports.bindOnExitHandler = bindOnExitHandler;
+function execHandlers(args) {
+    for (const handler of handlers) {
+        handler(...args);
     }
 }
-exports.bindCallbackOnExit = bindCallbackOnExit;
+function removeHandlers(handler) {
+    for (const signal of signals) {
+        process.removeListener(signal, handler);
+    }
+}
+function hasOnExitHandler(handler) {
+    return handlers.indexOf(handler) !== -1;
+}
+exports.hasOnExitHandler = hasOnExitHandler;
+function unbindOnExitHandler(callback) {
+    const i = handlers.indexOf(callback);
+    if (i === -1) {
+        return false;
+    }
+    handlers.splice(i, 1);
+    return true;
+}
+exports.unbindOnExitHandler = unbindOnExitHandler;
+function sleep(ms) {
+    return new Promise(resolve => {
+        const timeout = setTimeout(() => {
+            resolve();
+            clearTimeout(timeout);
+        }, ms);
+    });
+}
+exports.sleep = sleep;
 //# sourceMappingURL=util.service.js.map

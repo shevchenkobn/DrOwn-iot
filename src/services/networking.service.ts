@@ -6,7 +6,7 @@ import * as SocketIO from 'socket.io-client';
 import axios from 'axios';
 import { IDroneState } from './drone-state.service';
 import Socket = SocketIOClient.Socket;
-import { bindCallbackOnExit } from './util.service';
+import { bindOnExitHandler, sleep } from './util.service';
 import Emitter = SocketIOClient.Emitter;
 
 export class NetworkingService {
@@ -18,6 +18,7 @@ export class NetworkingService {
   private _onClose?: () => void;
   private _url: string;
   private _io?: Socket;
+  private _ioPromise?: Promise<Socket>;
   private _drone: IDroneState;
 
   constructor(
@@ -39,42 +40,55 @@ export class NetworkingService {
     this._disconnecting = false;
   }
 
-  async getSocket(): Promise<Socket> {
+  getSocket(): Promise<Socket> {
     if (this._io) {
-      if (!this._io.connected) {
-        this._io.connect();
-      }
-      return this._io;
+      return Promise.resolve(this._io);
     }
-    this._io = SocketIO(this._url + NetworkingService.SOCKETIO_NSP, {
-      path: NetworkingService.SOCKETIO_PATH,
-      timeout: 10000,
-      query: {
-        password: await this.getOrUpdatePassword(),
-      },
-    });
-    this._io.on('connect', () => {
-      console.debug('connect one');
-    });
-    this._io.on('connect', () => {
-      console.debug('connect two');
-      if (!this._onClose) {
-        this._onClose = () => {
-          this._disconnecting = true;
-          if (this._io) {
-            this._io.disconnect();
+    if (this._ioPromise) {
+      const promise = this._ioPromise;
+      return new Promise((resolve, reject) => {
+        promise.then(resolve, reject);
+      });
+    }
+    this._ioPromise = new Promise(async (resolve, reject) => {
+      try {
+        this._io =
+          SocketIO.connect(this._url + NetworkingService.SOCKETIO_NSP, {
+            path: NetworkingService.SOCKETIO_PATH,
+            timeout: 10000,
+            agent: false,
+            query: {
+              'device-id': await this._drone.getDeviceId(),
+              password: await this.getOrUpdatePassword(),
+            },
+          });
+        this._io.on('connect', () => {
+          if (!this._onClose) {
+            this._onClose = () => {
+              this._disconnecting = true;
+              if (this._io) {
+                this._io.disconnect();
+              }
+            };
+            bindOnExitHandler(this._onClose);
           }
-        };
-        bindCallbackOnExit(this._onClose);
+        });
+        this._io.on('reconnect_error', (reason: any) => {
+          if (!this._disconnecting) {
+            console.log(`Disconnected due to ${reason}. Reconnecting...`);
+            this.reconnect();
+          }
+        });
+        this._io.on('error', (err: any) => {
+          console.log(`Error ${err}.`);
+        });
+        resolve(this._io);
+        this._ioPromise = undefined;
+      } catch (err) {
+        reject(err);
       }
     });
-    this._io.on('reconnect_error', (reason: string) => {
-      if (!this._disconnecting) {
-        console.log(`Disconnected due to ${reason}. Reconnecting...`);
-        this.reconnect();
-      }
-    });
-    return this._io;
+    return this._ioPromise;
   }
 
   private reconnect() {
@@ -105,7 +119,6 @@ export class NetworkingService {
         },
       );
       password = response.data.password;
-      console.log(password);
       await this._drone.setPassword(password);
     }
     return password;

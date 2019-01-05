@@ -10,7 +10,7 @@
     "build": "rimraf ./dist && tsc",
     "start": "node ./dist",
     "start:b": "npm run build && node ./dist",
-    "start:brk": "node --inspect-brk ./dist",
+    "start:brk": "node --inspect-brk=19229 ./dist",
     "start:b:brk": "npm run build && node --inspect-brk ./dist",
     "start:dev": "node --inspect=19229 ./dist",
     "start:b:dev": "npm run build && node --inspect=19229 ./dist",

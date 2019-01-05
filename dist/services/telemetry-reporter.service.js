@@ -12,34 +12,36 @@ class TelemetryReporterService {
             return;
         }
         this._socket = await this._network.getSocket();
-        this._onConnect = (emitter) => {
-            if (this._interval && this._onExit) {
-                this._onExit();
+        if (this._interval && this._onExit) {
+            this._onExit();
+        }
+        this._interval = setInterval(async () => {
+            try {
+                const [longitude, latitude, batteryCharge, status] = await Promise.all([
+                    this._drone.getLongitude(),
+                    this._drone.getLatitude(),
+                    this._drone.getBatteryCharge(),
+                    this._drone.getStatus(),
+                ]);
+                this._socket.emit('telemetry', {
+                    status,
+                    longitude,
+                    latitude,
+                    batteryCharge,
+                });
             }
-            this._interval = setInterval(async () => {
-                try {
-                    const [longitude, latitude, batteryCharge] = await Promise.all([
-                        this._drone.getLongitude(),
-                        this._drone.getLatitude(),
-                        this._drone.getBatteryCharge(),
-                    ]);
-                    emitter.emit('telemetry', {
-                        longitude,
-                        latitude,
-                        batteryCharge,
-                    });
-                }
-                catch (err) {
-                    console.error('Telemetry report error', err);
-                }
-            }, this._period);
+            catch (err) {
+                console.error('Telemetry report error', err);
+            }
+        }, this._period);
+        this._onConnect = () => {
             if (!this._onExit) {
                 this._onExit = () => {
                     if (this._interval) {
                         this.stop();
                     }
                 };
-                util_service_1.bindCallbackOnExit(this._onExit);
+                util_service_1.bindOnExitHandler(this._onExit);
             }
             this._drone.on('disconnecting', this._onExit);
         };
