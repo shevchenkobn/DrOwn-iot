@@ -1,65 +1,91 @@
 import { NetworkingService } from './networking.service';
-import { InMemoryDroneState } from './drone-state.service';
+import { IDroneState, InMemoryDroneState } from './drone-state.service';
 import { bindCallbackOnExit } from './util.service';
 import { IConfigGetter } from './config-loader.service';
 import { Arguments } from 'yargs';
 import { IArgv } from './arg-parser.service';
+import Emitter = SocketIOClient.Emitter;
+import Socket = SocketIOClient.Socket;
 
 export class TelemetryReporterService {
-  private _isReporting: boolean;
   private _period: number;
   private _interval?: NodeJS.Timeout;
   private _onExit?: () => void;
   private _network: NetworkingService;
-  private _drone: InMemoryDroneState;
+  private _drone: IDroneState;
+
+  private _socket?: Socket;
+  private _onConnect?: (emitter: Emitter) => void;
+  private _onReconnectFailed?: () => void;
 
   constructor(
     network: NetworkingService,
-    drone: InMemoryDroneState,
+    drone: IDroneState,
     argv: Arguments<IArgv>,
     config: IConfigGetter,
   ) {
     this._period = argv.reportPeriod || config.get('reportPeriod');
     this._network = network;
     this._drone = drone;
-    this._isReporting = false;
-
-    bindCallbackOnExit(() => this.stop());
   }
 
   async start() {
     if (this._interval) {
       return;
     }
-    const emitter = await this._network.getEmitter();
-    this._interval = setInterval(async () => {
-      try {
-        emitter.emit('telemetry', {
-          longitude: await this._drone.getLongitude(),
-          latitude: await this._drone.getLatitude(),
-          batteryCharge: await this._drone.getBatteryCharge(),
-        });
-      } catch (err) {
-        console.error('Telemetry report error', err);
+    this._socket = await this._network.getSocket();
+    this._onConnect = (emitter: Emitter) => {
+      if (this._interval && this._onExit) {
+        this._onExit();
       }
-    }, this._period);
-    if (!this._onExit) {
-      this._onExit = () => {
-        if (!this._interval) {
-          return;
+      this._interval = setInterval(async () => {
+        try {
+          const [longitude, latitude, batteryCharge] = await Promise.all([
+            this._drone.getLongitude(),
+            this._drone.getLatitude(),
+            this._drone.getBatteryCharge(),
+          ]);
+          emitter.emit('telemetry', {
+            longitude,
+            latitude,
+            batteryCharge,
+          });
+        } catch (err) {
+          console.error('Telemetry report error', err);
         }
-        clearInterval(this._interval);
-        this._interval = undefined;
-      };
-      bindCallbackOnExit(this._onExit);
-    }
+      }, this._period);
+      if (!this._onExit) {
+        this._onExit = () => {
+          if (this._interval) {
+            this.stop();
+          }
+        };
+        bindCallbackOnExit(this._onExit);
+      }
+      this._drone.on('disconnecting', this._onExit);
+    };
+    this._socket.on('connect', this._onConnect);
+    this._onReconnectFailed = () => {
+      this.stop();
+    };
+    this._socket.on('reconnect_failed', this._onReconnectFailed);
   }
 
   stop() {
-    if (this._onExit) {
-      this._onExit();
-    } else {
-      console.warn('Telemetry reporting did\'t started and stopped');
+    if (!this._interval) {
+      console.warn('Telemetry reporter is not started!');
+      return;
     }
+
+    this._socket!.removeEventListener('connect', this._onConnect);
+    this._onConnect = undefined;
+    clearInterval(this._interval);
+    this._interval = undefined;
+    this._socket!.removeEventListener(
+      'reconnect_failed',
+      this._onReconnectFailed,
+    );
+    this._onReconnectFailed = undefined;
+    this._drone.removeListener('disconnecting', this._onExit!);
   }
 }

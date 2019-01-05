@@ -16,7 +16,6 @@ export class NetworkingService {
 
   private _disconnecting: boolean;
   private _onClose?: () => void;
-  private _onConnect?: () => void;
   private _url: string;
   private _io?: Socket;
   private _drone: IDroneState;
@@ -38,17 +37,6 @@ export class NetworkingService {
 
     this._drone = state;
     this._disconnecting = false;
-  }
-
-  getEmitter() {
-    return new Promise<Emitter>(async (resolve, reject) => {
-      try {
-        const io = await this.getSocket();
-        io.on('connect', resolve);
-      } catch (err) {
-        reject(err);
-      }
-    });
   }
 
   async getSocket(): Promise<Socket> {
@@ -80,7 +68,7 @@ export class NetworkingService {
         bindCallbackOnExit(this._onClose);
       }
     });
-    this._io.on('disconnect', (reason: string) => {
+    this._io.on('reconnect_error', (reason: string) => {
       if (!this._disconnecting) {
         console.log(`Disconnected due to ${reason}. Reconnecting...`);
         this.reconnect();

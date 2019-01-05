@@ -5,8 +5,10 @@ import { promises as fs, constants as fsConst } from 'fs';
 import * as path from 'path';
 import * as yaml from 'js-yaml';
 import { bindCallbackOnExit } from './util.service';
+import { TelemetryUpdaterService } from './telemetry-updater.service';
+import { EventEmitter } from 'events';
 
-export interface IDroneState {
+export interface IDroneState extends EventEmitter {
   readonly connected: boolean;
 
   getLongitude(): Promise<number>;
@@ -16,6 +18,8 @@ export interface IDroneState {
   getCoords(): Promise<[number, number]>;
 
   getBatteryCharge(): Promise<number>;
+
+  getLoad(): Promise<number>;
 
   getDeviceId(): Promise<string>;
 
@@ -44,7 +48,11 @@ export interface IDroneState {
   disconnect(): Promise<void>;
 }
 
-export class InMemoryDroneState implements IDroneState {
+export enum DisconnectReason {
+  BATTERY_CHARGE,
+}
+
+export class InMemoryDroneState extends EventEmitter implements IDroneState {
   private _deviceId!: string;
   private _enginePower!: number;
   private _batteryPower!: number;
@@ -55,7 +63,9 @@ export class InMemoryDroneState implements IDroneState {
   private _batteryCharge!: number;
   private _longitude!: number;
   private _latitude!: number;
+  private _load!: number;
 
+  private _updater: TelemetryUpdaterService;
   private _connected: boolean;
   private _snapshotPath: string;
   private _passwordPath: string;
@@ -80,18 +90,35 @@ export class InMemoryDroneState implements IDroneState {
   }
 
   set batteryCharge(value: number) {
-    if (!isCharge(value)) {
+    if (!isCharge(value, true)) {
       throw new TypeError(`Bad battery charge value ${value}`);
+    }
+    if (value <= 0) {
+      this._batteryCharge = 0;
+      console.log('Disconnecting due to battery going down');
+      this.emit('disconnecting', DisconnectReason.BATTERY_CHARGE);
+      this.disconnect().then(() => {
+        console.log('Drone is disconnected');
+      });
     }
     this._batteryCharge = value;
   }
 
+  set load(value: number) {
+    if (value < 0) {
+      throw new TypeError('Load cannot be negative!');
+    }
+    this._load = value;
+  }
+
   constructor(argv: Arguments<IArgv>, config: IConfigGetter) {
+    super();
     this._connected = false;
     this._snapshotPath = path.resolve(argv.snapshotPath || config.get('snapshotPath'));
     this._passwordPath = config.has('passwordPath')
       ? config.get('passwordPath')
       : argv.passwordPath;
+    this._updater = new TelemetryUpdaterService(this);
   }
 
   public async connect(): Promise<void> {
@@ -134,24 +161,39 @@ export class InMemoryDroneState implements IDroneState {
       throw new TypeError(`Can carry liquids is bad ${snapshot.canCarryLiquids}`);
     }
     this._canCarryLiquids = snapshot.canCarryLiquids;
+    this._load = isPositive(snapshot.load) ? snapshot.load : 0;
 
-    if (!isLongitude(snapshot.latitude)) {
-      throw new TypeError(`Latitude is bad ${snapshot.latitude}`);
+    if (snapshot.latitude !== undefined) {
+      if (!isLatitude(snapshot.latitude)) {
+        throw new TypeError(`Latitude is bad ${snapshot.latitude}`);
+      }
+      this._latitude = snapshot.latitude;
+    } else {
+      this._latitude = this._baseLatitude;
     }
-    this._latitude = snapshot.latitude;
-    if (!isLatitude(snapshot.longitude)) {
-      throw new TypeError(`Longitude is bad ${snapshot.longitude}`);
+    if (snapshot.longitude !== undefined) {
+      if (!isLongitude(snapshot.longitude)) {
+        throw new TypeError(`Longitude is bad ${snapshot.longitude}`);
+      }
+      this._longitude = snapshot.longitude;
+    } else {
+      this._longitude = this._baseLongitude;
     }
-    this._longitude = snapshot.longitude;
-    if (!isCharge(snapshot.batteryCharge)) {
-      throw new TypeError(`Battery charge is bad ${snapshot.batteryCharge}`);
+    if (snapshot.batteryCharge !== undefined) {
+      if (!isCharge(snapshot.batteryCharge)) {
+        throw new TypeError(`Battery charge is bad ${snapshot.batteryCharge}`);
+      }
+      this._batteryCharge = snapshot.batteryCharge;
+    } else {
+      this._batteryCharge = 100;
     }
-    this._batteryCharge = snapshot.batteryCharge;
+
     if (!this._closeCallback) {
       this._closeCallback = () => this.disconnect();
       bindCallbackOnExit(this._closeCallback);
     }
     this._connected = true;
+    this._updater.start();
   }
 
   public async disconnect(): Promise<void> {
@@ -179,6 +221,7 @@ export class InMemoryDroneState implements IDroneState {
       throw err;
     }
     this._connected = false;
+    this._updater.stop();
   }
 
   public async getDeviceId(): Promise<string> {
@@ -300,11 +343,18 @@ export class InMemoryDroneState implements IDroneState {
       [this._latitude, this._longitude] as [number, number],
     );
   }
+
+  public async getLoad(): Promise<number> {
+    if (!this._connected) {
+      await this.connect();
+    }
+    return Promise.resolve(this._load);
+  }
 }
 
-function isCharge(value: any) {
+function isCharge(value: any, skipNegative = false) {
   return typeof value === 'number' && (
-    value >= 0 && value <= 100
+    (skipNegative || value >= 0) && value <= 100
   );
 }
 
