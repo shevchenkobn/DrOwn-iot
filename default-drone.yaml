@@ -1,0 +1,10 @@
+deviceId: '123456789012'
+baseLongitude: 12
+baseLatitude: 23
+enginePower: 5000
+batteryPower: 9000
+loadCapacity: 2000
+canCarryLiquids: true
+latitude: 23
+longitude: 12
+batteryCharge: 99.85879629629488

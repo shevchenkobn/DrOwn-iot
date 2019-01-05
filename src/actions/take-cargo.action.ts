@@ -25,11 +25,13 @@ export class TakeCargoAction implements IDroneAction {
         resolve(DroneOrderStatus.HAS_LOAD);
         return;
       }
-      const delay = Math.random() * (await drone.getLoadCapacity());
+      const delay = Math.random() * (
+        await drone.getLoadCapacity()
+      );
       const chargeDelta = 0.25 * delay;
-      const timeout = setTimeout(() => {
+      const timeout = setTimeout(async () => {
         drone.load = delay;
-        drone.batteryCharge -= chargeDelta;
+        drone.batteryCharge -= await drone.getBatteryCharge() - chargeDelta;
         resolve(DroneOrderStatus.DONE);
         this._orders.delete(order);
       }, delay);

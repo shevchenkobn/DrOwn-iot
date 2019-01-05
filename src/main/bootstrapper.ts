@@ -12,10 +12,14 @@ export async function bootstrap(argv: Arguments<IArgv>) {
   const initPromises = [];
 
   const drone = new InMemoryDroneState(argv, config);
-  initPromises.push(drone.connect());
+  initPromises.push(drone.connect().catch(err => {
+    console.error('Drone state init error', err);
+  }));
 
   const networkService = new NetworkingService(argv, config, drone);
-  initPromises.push(networkService.getSocket());
+  initPromises.push(networkService.getSocket().catch(err => {
+    console.error('Network service error', err);
+  }));
 
   const reporter = new TelemetryReporterService(
     networkService,
@@ -23,7 +27,9 @@ export async function bootstrap(argv: Arguments<IArgv>) {
     argv,
     config,
   );
-  initPromises.push(reporter.start());
+  initPromises.push(reporter.start().catch(err => {
+    console.error('Reporter service', err);
+  }));
 
   const results = await Promise.all(initPromises as Promise<any>[]);
 

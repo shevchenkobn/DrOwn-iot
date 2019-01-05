@@ -31,7 +31,6 @@ export class TelemetryUpdaterService {
 
   start() {
     if (this._interval) {
-      console.warn('Telemetry updater already started');
       return;
     }
     this._interval = setInterval(async () => {
@@ -44,7 +43,8 @@ export class TelemetryUpdaterService {
           / await this._drone.getLoadCapacity()
         )
       );
-      this._drone.batteryCharge -= currentDelta;
+      this._drone.batteryCharge =
+        await this._drone.getBatteryCharge() - currentDelta;
     }, TelemetryUpdaterService.INTERVAL);
     this._onDisconnect = reason => {
       this.stop();

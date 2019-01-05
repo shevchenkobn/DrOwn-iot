@@ -19,9 +19,9 @@ class ReleaseCargoAction {
                 return;
             }
             const chargeDelta = 0.25 * load;
-            const timeout = setTimeout(() => {
+            const timeout = setTimeout(async () => {
                 drone.load = 0;
-                drone.batteryCharge -= chargeDelta;
+                drone.batteryCharge -= await drone.getBatteryCharge() - chargeDelta;
                 resolve(index_1.DroneOrderStatus.DONE);
                 this._orders.delete(order);
             }, load / 2);

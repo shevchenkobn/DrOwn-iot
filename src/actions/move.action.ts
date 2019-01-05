@@ -83,8 +83,8 @@ export class MoveAction implements IDroneAction {
       const batteryCharge = await drone.getBatteryCharge();
       const powerConsumptionPerPeriod = TelemetryUpdaterService
         .getChargeDeltaForSecond(batteryCharge) * (
-          MoveAction.UPDATE_PERIOD / 1000
-        );
+        MoveAction.UPDATE_PERIOD / 1000
+      );
 
       const targetLongitude = order.longitude as number;
       const targetLatitude = order.latitude as number;
@@ -95,10 +95,12 @@ export class MoveAction implements IDroneAction {
         latitudeChange,
         longitudeChange,
       );
-      let counter = hours * 3600 * (1000 / MoveAction.UPDATE_PERIOD);
+      let counter = hours * 3600 * (
+        1000 / MoveAction.UPDATE_PERIOD
+      );
       const latitudeDelta = latitudeChange / counter;
       const longitudeDelta = latitudeChange / counter;
-      const interval = setInterval(() => {
+      const interval = setInterval(async () => {
         counter -= 1;
         if (counter === 0) {
           drone.latitude = targetLatitude;
@@ -107,7 +109,8 @@ export class MoveAction implements IDroneAction {
           drone.latitude += latitudeDelta;
           drone.longitude += longitudeDelta;
         }
-        drone.batteryCharge -= 2 * powerConsumptionPerPeriod;
+        drone.batteryCharge =
+          await drone.getBatteryCharge() - 2 * powerConsumptionPerPeriod;
       }, MoveAction.UPDATE_PERIOD);
       this._orders.set(order, interval);
     });

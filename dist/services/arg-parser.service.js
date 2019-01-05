@@ -25,9 +25,10 @@ function parseArgs(args = process.argv.slice(2)) {
         description: 'Path to snapshot file of drone state',
     })
         .option('reportPeriod', {
-        alias: ['p', 'period'],
+        alias: ['i', 'period'],
         number: true,
         demandOption: false,
+        default: 2000,
         description: 'Period of telemetry report in ms',
     })
         .argv;

@@ -19,9 +19,9 @@ class TakeCargoAction {
             }
             const delay = Math.random() * (await drone.getLoadCapacity());
             const chargeDelta = 0.25 * delay;
-            const timeout = setTimeout(() => {
+            const timeout = setTimeout(async () => {
                 drone.load = delay;
-                drone.batteryCharge -= chargeDelta;
+                drone.batteryCharge -= await drone.getBatteryCharge() - chargeDelta;
                 resolve(index_1.DroneOrderStatus.DONE);
                 this._orders.delete(order);
             }, delay);

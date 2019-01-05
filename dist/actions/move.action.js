@@ -58,7 +58,7 @@ class MoveAction {
             let counter = hours * 3600 * (1000 / MoveAction.UPDATE_PERIOD);
             const latitudeDelta = latitudeChange / counter;
             const longitudeDelta = latitudeChange / counter;
-            const interval = setInterval(() => {
+            const interval = setInterval(async () => {
                 counter -= 1;
                 if (counter === 0) {
                     drone.latitude = targetLatitude;
@@ -68,7 +68,8 @@ class MoveAction {
                     drone.latitude += latitudeDelta;
                     drone.longitude += longitudeDelta;
                 }
-                drone.batteryCharge -= 2 * powerConsumptionPerPeriod;
+                drone.batteryCharge =
+                    await drone.getBatteryCharge() - 2 * powerConsumptionPerPeriod;
             }, MoveAction.UPDATE_PERIOD);
             this._orders.set(order, interval);
         });

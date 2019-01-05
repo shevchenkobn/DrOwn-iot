@@ -115,9 +115,7 @@ export class InMemoryDroneState extends EventEmitter implements IDroneState {
     super();
     this._connected = false;
     this._snapshotPath = path.resolve(argv.snapshotPath || config.get('snapshotPath'));
-    this._passwordPath = config.has('passwordPath')
-      ? config.get('passwordPath')
-      : argv.passwordPath;
+    this._passwordPath = argv.passwordPath || config.get('passwordPath');
     this._updater = new TelemetryUpdaterService(this);
   }
 
@@ -202,6 +200,7 @@ export class InMemoryDroneState extends EventEmitter implements IDroneState {
       return;
     }
     const serializedSnapshot = yaml.safeDump({
+      deviceId: this._deviceId,
       baseLongitude: this._baseLongitude,
       baseLatitude: this._baseLatitude,
       enginePower: this._enginePower,

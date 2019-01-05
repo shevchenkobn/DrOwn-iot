@@ -12,8 +12,8 @@
     "start:b": "npm run build && node ./dist",
     "start:brk": "node --inspect-brk ./dist",
     "start:b:brk": "npm run build && node --inspect-brk ./dist",
-    "start:dev": "node --inspect=9229 ./dist",
-    "start:b:dev": "npm run build && node --inspect=9229 ./dist",
+    "start:dev": "node --inspect=19229 ./dist",
+    "start:b:dev": "npm run build && node --inspect=19229 ./dist",
     "watch": "nodemon -w src/ -w config/ -e ts,yaml -x \"npm run start:b:dev\""
   },
   "engines": {

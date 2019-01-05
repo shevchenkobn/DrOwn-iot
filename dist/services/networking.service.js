@@ -69,12 +69,17 @@ class NetworkingService {
             password = await this._drone.getPassword();
         }
         else {
-            const response = await axios_1.default.post(this._url + NetworkingService.PASSWORD_PATH, null, {
+            console.log(this._url);
+            const response = await axios_1.default.post(this._url + NetworkingService.PASSWORD_PATH, {}, {
+                headers: {
+                    'Content-Type': 'application/json',
+                },
                 params: {
                     'device-id': await this._drone.getDeviceId(),
                 },
             });
-            password = response.data;
+            password = response.data.password;
+            console.log(password);
             await this._drone.setPassword(password);
         }
         return password;
