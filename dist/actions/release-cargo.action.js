@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const index_1 = require("./index");
 const eq_collections_1 = require("eq-collections");
+const drone_state_service_1 = require("../services/drone-state.service");
 class ReleaseCargoAction {
     constructor(queueManager) {
         this._queue = queueManager;
@@ -19,9 +20,11 @@ class ReleaseCargoAction {
                 return;
             }
             const chargeDelta = 0.25 * load;
+            drone.status = drone_state_service_1.DroneStatus.RELEASING_CARGO;
             const timeout = setTimeout(async () => {
                 drone.load = 0;
-                drone.batteryCharge -= await drone.getBatteryCharge() - chargeDelta;
+                drone.batteryCharge = await drone.getBatteryCharge() - chargeDelta;
+                drone.status = drone_state_service_1.DroneStatus.WAITING;
                 resolve(index_1.DroneOrderStatus.DONE);
                 this._orders.delete(order);
             }, load / 2);

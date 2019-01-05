@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const index_1 = require("./index");
 const eq_collections_1 = require("eq-collections");
+const drone_state_service_1 = require("../services/drone-state.service");
 const telemetry_updater_service_1 = require("../services/telemetry-updater.service");
 class MoveAction {
     constructor(queueManager) {
@@ -34,11 +35,11 @@ class MoveAction {
     }
     async getLongitudeDistance(longitude) {
         const droneLongitude = await this._queue.drone.getLongitude();
-        return MoveAction.KM_PER_DEGREE * (droneLongitude - longitude);
+        return MoveAction.KM_PER_DEGREE * (longitude - droneLongitude);
     }
     async getLatitudeDistance(latitude) {
         const droneLatitude = await this._queue.drone.getLatitude();
-        return MoveAction.KM_PER_DEGREE * (droneLatitude - latitude);
+        return MoveAction.KM_PER_DEGREE * (latitude - droneLatitude);
     }
     run(order) {
         return new Promise(async (resolve) => {
@@ -50,23 +51,26 @@ class MoveAction {
             const batteryCharge = await drone.getBatteryCharge();
             const powerConsumptionPerPeriod = telemetry_updater_service_1.TelemetryUpdaterService
                 .getChargeDeltaForSecond(batteryCharge) * (MoveAction.UPDATE_PERIOD / 1000);
-            const targetLongitude = order.longitude;
-            const targetLatitude = order.latitude;
+            const targetLongitude = Number(order.longitude);
+            const targetLatitude = Number(order.latitude);
             const latitudeChange = await this.getLatitudeDistance(targetLatitude);
             const longitudeChange = await this.getLongitudeDistance(targetLongitude);
             const [distance, hours] = await this.getDistanceAndHours(latitudeChange, longitudeChange);
             let counter = hours * 3600 * (1000 / MoveAction.UPDATE_PERIOD);
             const latitudeDelta = latitudeChange / counter;
-            const longitudeDelta = latitudeChange / counter;
+            const longitudeDelta = longitudeChange / counter;
+            drone.status = drone_state_service_1.DroneStatus.MOVING;
             const interval = setInterval(async () => {
                 counter -= 1;
                 if (counter === 0) {
                     drone.latitude = targetLatitude;
                     drone.longitude = targetLongitude;
+                    drone.status = drone_state_service_1.DroneStatus.WAITING;
+                    this._orders.delete(order);
                 }
                 else {
-                    drone.latitude += latitudeDelta;
-                    drone.longitude += longitudeDelta;
+                    drone.latitude = await drone.getLatitude() + latitudeDelta;
+                    drone.longitude = await drone.getLongitude() + longitudeDelta;
                 }
                 drone.batteryCharge =
                     await drone.getBatteryCharge() - 2 * powerConsumptionPerPeriod;
@@ -86,7 +90,6 @@ class MoveAction {
 }
 MoveAction.KM_PER_DEGREE = 111;
 MoveAction.KM_PER_HOUR_PER_ENGINE_POWER_UNIT = Math.sqrt(2)
-    * 3600
     * MoveAction.KM_PER_DEGREE
     / 6
     / 1000;

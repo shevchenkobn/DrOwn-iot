@@ -6,9 +6,7 @@ const axios_1 = require("axios");
 const util_service_1 = require("./util.service");
 class NetworkingService {
     constructor(argv, config, state) {
-        const urlString = config.has('serverUrl')
-            ? config.get('serverUrl')
-            : argv.url;
+        const urlString = argv.url || config.get('serverUrl');
         // Validate url
         url.parse(urlString);
         this._url = urlString;

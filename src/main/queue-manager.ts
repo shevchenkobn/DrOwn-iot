@@ -1,5 +1,5 @@
 import { NetworkingService } from '../services/networking.service';
-import { IDroneState } from '../services/drone-state.service';
+import { DroneStatus, IDroneState } from '../services/drone-state.service';
 import {
   DroneOrderAction,
   DroneOrderStatus,
@@ -84,6 +84,7 @@ export class QueueManager implements IOrderQueue {
     }
     this._socket = await this._network.getSocket();
     this._onOrder = async (order, cb) => {
+      console.log('fuckers');
       if (order.action === DroneOrderAction.STOP_AND_WAIT) {
         const queue = this._orderQueue.slice();
         this._orderQueue.length = 0;
@@ -105,11 +106,12 @@ export class QueueManager implements IOrderQueue {
         cb(status);
         return;
       }
-      cb(DroneOrderStatus.ENQUEUED);
       this._orderQueue.push(order);
       if (this._orderQueue.length > 1) {
+        cb(DroneOrderStatus.STARTED);
         return;
       }
+      cb(DroneOrderStatus.ENQUEUED);
       this.runQueue().catch(err => {
         console.error('Error while running queue loop', err);
         process.emit('SIGINT', 'SIGINT');
@@ -117,7 +119,7 @@ export class QueueManager implements IOrderQueue {
         console.debug('Queue was cleared');
       });
     };
-    this._socket.on(QueueManager.ORDER_EVENT, this._onOrder);
+    this._socket!.on(QueueManager.ORDER_EVENT, this._onOrder);
 
     this._onReconnectFailed = () => {
       this.stop();

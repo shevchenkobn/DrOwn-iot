@@ -33,6 +33,7 @@ class QueueManager {
         }
         this._socket = await this._network.getSocket();
         this._onOrder = async (order, cb) => {
+            console.log('fuckers');
             if (order.action === actions_1.DroneOrderAction.STOP_AND_WAIT) {
                 const queue = this._orderQueue.slice();
                 this._orderQueue.length = 0;
@@ -50,11 +51,12 @@ class QueueManager {
                 cb(status);
                 return;
             }
-            cb(actions_1.DroneOrderStatus.ENQUEUED);
             this._orderQueue.push(order);
             if (this._orderQueue.length > 1) {
+                cb(actions_1.DroneOrderStatus.STARTED);
                 return;
             }
+            cb(actions_1.DroneOrderStatus.ENQUEUED);
             this.runQueue().catch(err => {
                 console.error('Error while running queue loop', err);
                 process.emit('SIGINT', 'SIGINT');

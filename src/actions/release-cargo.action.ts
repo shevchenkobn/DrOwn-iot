@@ -1,7 +1,10 @@
 import { DroneOrderStatus, IDroneAction } from './index';
 import { IOrderInfo, QueueManager } from '../main/queue-manager';
 import { HashOnlyMap } from 'eq-collections';
-import { InMemoryDroneState } from '../services/drone-state.service';
+import {
+  DroneStatus,
+  InMemoryDroneState,
+} from '../services/drone-state.service';
 
 export class ReleaseCargoAction implements IDroneAction {
   protected _queue: QueueManager;
@@ -27,9 +30,11 @@ export class ReleaseCargoAction implements IDroneAction {
         return;
       }
       const chargeDelta = 0.25 * load;
+      drone.status = DroneStatus.RELEASING_CARGO;
       const timeout = setTimeout(async () => {
         drone.load = 0;
-        drone.batteryCharge -= await drone.getBatteryCharge() - chargeDelta;
+        drone.batteryCharge = await drone.getBatteryCharge() - chargeDelta;
+        drone.status = DroneStatus.WAITING;
         resolve(DroneOrderStatus.DONE);
         this._orders.delete(order);
       }, load / 2);

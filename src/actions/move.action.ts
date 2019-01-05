@@ -1,13 +1,15 @@
 import { DroneOrderStatus, IDroneAction } from './index';
 import { HashOnlyMap } from 'eq-collections';
 import { IOrderInfo, QueueManager } from '../main/queue-manager';
-import { InMemoryDroneState } from '../services/drone-state.service';
+import {
+  DroneStatus,
+  InMemoryDroneState,
+} from '../services/drone-state.service';
 import { TelemetryUpdaterService } from '../services/telemetry-updater.service';
 
 export class MoveAction implements IDroneAction {
   public static readonly KM_PER_DEGREE = 111;
   public static readonly KM_PER_HOUR_PER_ENGINE_POWER_UNIT = Math.sqrt(2)
-    * 3600
     * MoveAction.KM_PER_DEGREE
     / 6
     / 1000;
@@ -62,14 +64,14 @@ export class MoveAction implements IDroneAction {
   private async getLongitudeDistance(longitude: number) {
     const droneLongitude = await this._queue.drone.getLongitude();
     return MoveAction.KM_PER_DEGREE * (
-      droneLongitude - longitude
+      longitude - droneLongitude
     );
   }
 
   private async getLatitudeDistance(latitude: number) {
     const droneLatitude = await this._queue.drone.getLatitude();
     return MoveAction.KM_PER_DEGREE * (
-      droneLatitude - latitude
+      latitude - droneLatitude
     );
   }
 
@@ -86,8 +88,8 @@ export class MoveAction implements IDroneAction {
         MoveAction.UPDATE_PERIOD / 1000
       );
 
-      const targetLongitude = order.longitude as number;
-      const targetLatitude = order.latitude as number;
+      const targetLongitude = Number(order.longitude);
+      const targetLatitude = Number(order.latitude);
 
       const latitudeChange = await this.getLatitudeDistance(targetLatitude);
       const longitudeChange = await this.getLongitudeDistance(targetLongitude);
@@ -99,15 +101,18 @@ export class MoveAction implements IDroneAction {
         1000 / MoveAction.UPDATE_PERIOD
       );
       const latitudeDelta = latitudeChange / counter;
-      const longitudeDelta = latitudeChange / counter;
+      const longitudeDelta = longitudeChange / counter;
+      drone.status = DroneStatus.MOVING;
       const interval = setInterval(async () => {
         counter -= 1;
         if (counter === 0) {
           drone.latitude = targetLatitude;
           drone.longitude = targetLongitude;
+          drone.status = DroneStatus.WAITING;
+          this._orders.delete(order);
         } else {
-          drone.latitude += latitudeDelta;
-          drone.longitude += longitudeDelta;
+          drone.latitude = await drone.getLatitude() + latitudeDelta;
+          drone.longitude = await drone.getLongitude() + longitudeDelta;
         }
         drone.batteryCharge =
           await drone.getBatteryCharge() - 2 * powerConsumptionPerPeriod;

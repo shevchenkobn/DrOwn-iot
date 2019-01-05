@@ -26,9 +26,7 @@ export class NetworkingService {
     config: IConfigGetter,
     state: IDroneState,
   ) {
-    const urlString = config.has('serverUrl')
-      ? config.get('serverUrl')
-      : argv.url;
+    const urlString = argv.url || config.get('serverUrl');
     // Validate url
     url.parse(urlString as any);
     this._url = urlString as string;
