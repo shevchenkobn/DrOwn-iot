@@ -14,6 +14,12 @@ class NetworkingService {
             throw new Error('URL mustn\'t finished with a slash');
         }
         this._drone = state;
+        this._drone.on('disconnecting', () => {
+            if (this._io) {
+                this._io.disconnect();
+            }
+            process.emit('SIGINT', 'SIGINT');
+        });
         this._disconnecting = false;
     }
     getSocket() {

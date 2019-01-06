@@ -97,19 +97,25 @@ export class MoveAction implements IDroneAction {
         latitudeChange,
         longitudeChange,
       );
+      // tslint:disable-next-line:max-line-length
+      console.log(`Will arrive in ${hours * 60} minutes to (${order.latitude}, ${order.longitude})`);
       let counter = hours * 3600 * (
         1000 / MoveAction.UPDATE_PERIOD
       );
-      const latitudeDelta = latitudeChange / counter;
-      const longitudeDelta = longitudeChange / counter;
+      const latitudeDelta = latitudeChange / counter / MoveAction.KM_PER_DEGREE;
+      const longitudeDelta = longitudeChange
+        / counter
+        / MoveAction.KM_PER_DEGREE;
       drone.status = DroneStatus.MOVING;
       const interval = setInterval(async () => {
         counter -= 1;
-        if (counter === 0) {
+        if (counter < 0) {
           drone.latitude = targetLatitude;
           drone.longitude = targetLongitude;
           drone.status = DroneStatus.WAITING;
-          this._orders.delete(order);
+          this.cancel(order);
+          console.log('Arrived');
+          resolve(DroneOrderStatus.DONE);
         } else {
           drone.latitude = await drone.getLatitude() + latitudeDelta;
           drone.longitude = await drone.getLongitude() + longitudeDelta;

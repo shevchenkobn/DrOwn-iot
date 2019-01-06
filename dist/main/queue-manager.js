@@ -8,6 +8,7 @@ class QueueManager {
         this._drone = drone;
         this._orderQueue = [];
         this._actions = actions_1.getActions(this);
+        this._queueRunning = false;
     }
     get drone() {
         return this._drone;
@@ -33,35 +34,31 @@ class QueueManager {
         }
         this._socket = await this._network.getSocket();
         this._onOrder = async (order, cb) => {
-            console.log('fuckers');
             if (order.action === actions_1.DroneOrderAction.STOP_AND_WAIT) {
-                const queue = this._orderQueue.slice();
-                this._orderQueue.length = 0;
-                for (const order of queue) {
-                    const action = this._actions.get(order.action);
-                    action.cancel(order);
-                    if (this._socket) {
-                        this._socket.emit(QueueManager.STATUS_EVENT, order.droneOrderId, actions_1.DroneOrderStatus.SKIPPED);
-                    }
-                }
+                this.emptyQueue();
+                cb(actions_1.DroneOrderStatus.DONE);
                 return;
             }
             const status = await this.beforeEnqueueStatus(order);
+            if (status === actions_1.DroneOrderStatus.STARTED) {
+                cb(actions_1.DroneOrderStatus.ERROR);
+                return;
+            }
             if (status !== actions_1.DroneOrderStatus.ENQUEUED) {
                 cb(status);
                 return;
             }
             this._orderQueue.push(order);
-            if (this._orderQueue.length > 1) {
-                cb(actions_1.DroneOrderStatus.STARTED);
+            if (this._queueRunning) {
+                cb(actions_1.DroneOrderStatus.ENQUEUED);
                 return;
             }
-            cb(actions_1.DroneOrderStatus.ENQUEUED);
+            cb(actions_1.DroneOrderStatus.STARTED);
             this.runQueue().catch(err => {
                 console.error('Error while running queue loop', err);
                 process.emit('SIGINT', 'SIGINT');
             }).then(() => {
-                console.debug('Queue was cleared');
+                // console.debug('Queue was cleared');
             });
         };
         this._socket.on(QueueManager.ORDER_EVENT, this._onOrder);
@@ -76,21 +73,36 @@ class QueueManager {
             util_service_1.bindOnExitHandler(this._onExit);
         }
     }
+    emptyQueue() {
+        const queue = this._orderQueue.slice();
+        console.log(`Clearing queue of ${queue.length} orders`);
+        this._orderQueue.length = 0;
+        for (const order of queue) {
+            const action = this._actions.get(order.action);
+            action.cancel(order);
+            if (this._socket) {
+                this._socket.emit(QueueManager.STATUS_EVENT, order.droneOrderId, actions_1.DroneOrderStatus.SKIPPED);
+            }
+        }
+    }
     async runQueue() {
-        if (this._orderQueue.length === 0) {
+        if (this._queueRunning) {
             return;
         }
+        this._queueRunning = true;
         while (this._orderQueue.length > 0) {
-            const order = this._orderQueue.shift();
+            const order = this._orderQueue[0];
             const action = this._actions.get(order.action);
             const status = await action.run(order);
+            this._orderQueue.shift();
             if (this._socket) {
-                this._socket.emit(QueueManager.STATUS_EVENT, status);
+                this._socket.emit(QueueManager.STATUS_EVENT, order.droneOrderId, status);
             }
             else {
                 break;
             }
         }
+        this._queueRunning = false;
     }
     stop() {
         if (!this._socket) {
@@ -102,6 +114,7 @@ class QueueManager {
         this._socket.removeEventListener('reconnect_failed', this._onReconnectFailed);
         this._onReconnectFailed = undefined;
         this._socket = undefined;
+        this.emptyQueue();
     }
     async beforeEnqueueStatus(order) {
         const action = this._actions.get(order.action);

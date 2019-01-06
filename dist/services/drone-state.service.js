@@ -22,7 +22,7 @@ class InMemoryDroneState extends events_1.EventEmitter {
         return this._connected;
     }
     set status(value) {
-        if (typeof value === 'number' && DroneStatus[value]) {
+        if (typeof value !== 'number' || !DroneStatus[value]) {
             throw new TypeError(`Bad status value ${value}`);
         }
         this._status = value;
@@ -157,6 +157,7 @@ class InMemoryDroneState extends events_1.EventEmitter {
             latitude: this._latitude,
             longitude: this._longitude,
             batteryCharge: this._batteryCharge,
+            load: this._load,
         });
         try {
             await fs_1.promises.writeFile(this._snapshotPath, serializedSnapshot);

@@ -5,6 +5,7 @@ import {
   DroneStatus,
   InMemoryDroneState,
 } from '../services/drone-state.service';
+import { TelemetryUpdaterService } from '../services/telemetry-updater.service';
 
 export class ReleaseCargoAction implements IDroneAction {
   protected _queue: QueueManager;
@@ -29,14 +30,20 @@ export class ReleaseCargoAction implements IDroneAction {
         resolve(DroneOrderStatus.HAS_NO_LOAD);
         return;
       }
-      const chargeDelta = 0.25 * load;
+      const chargeDelta = 2
+        * (load / await drone.getLoadCapacity())
+        * TelemetryUpdaterService.getChargeDeltaForSecond(
+          await drone.getBatteryPower(),
+        );
       drone.status = DroneStatus.RELEASING_CARGO;
+      console.log(`Unloading ${load} weight...`);
       const timeout = setTimeout(async () => {
         drone.load = 0;
         drone.batteryCharge = await drone.getBatteryCharge() - chargeDelta;
         drone.status = DroneStatus.WAITING;
+        this.cancel(order);
+        console.log('Unloaded.');
         resolve(DroneOrderStatus.DONE);
-        this._orders.delete(order);
       }, load / 2);
       this._orders.set(order, timeout);
     });

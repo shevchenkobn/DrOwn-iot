@@ -5,6 +5,7 @@ import {
   DroneStatus,
   InMemoryDroneState,
 } from '../services/drone-state.service';
+import { TelemetryUpdaterService } from '../services/telemetry-updater.service';
 
 export class TakeCargoAction implements IDroneAction {
   protected _queue: QueueManager;
@@ -28,17 +29,22 @@ export class TakeCargoAction implements IDroneAction {
         resolve(DroneOrderStatus.HAS_LOAD);
         return;
       }
-      const delay = Math.random() * (
-        await drone.getLoadCapacity()
-      );
-      const chargeDelta = 0.25 * delay;
+      const loadCapacity = await drone.getLoadCapacity();
+      const delay = Math.random() * loadCapacity;
+      const chargeDelta = 2
+        * (delay / loadCapacity)
+        * TelemetryUpdaterService.getChargeDeltaForSecond(
+          await drone.getBatteryPower(),
+        );
       drone.status = DroneStatus.TAKING_CARGO;
+      console.log(`Loading ${delay} weight...`);
       const timeout = setTimeout(async () => {
         drone.load = delay;
-        drone.batteryCharge -= await drone.getBatteryCharge() - chargeDelta;
+        drone.batteryCharge = await drone.getBatteryCharge() - chargeDelta;
         drone.status = DroneStatus.WAITING;
+        this.cancel(order);
+        console.log('Loaded.');
         resolve(DroneOrderStatus.DONE);
-        this._orders.delete(order);
       }, delay);
       this._orders.set(order, timeout);
     });

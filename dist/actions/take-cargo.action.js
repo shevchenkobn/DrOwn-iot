@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const index_1 = require("./index");
 const eq_collections_1 = require("eq-collections");
 const drone_state_service_1 = require("../services/drone-state.service");
+const telemetry_updater_service_1 = require("../services/telemetry-updater.service");
 class TakeCargoAction {
     constructor(queueManager) {
         this._queue = queueManager;
@@ -18,15 +19,20 @@ class TakeCargoAction {
                 resolve(index_1.DroneOrderStatus.HAS_LOAD);
                 return;
             }
-            const delay = Math.random() * (await drone.getLoadCapacity());
-            const chargeDelta = 0.25 * delay;
+            const loadCapacity = await drone.getLoadCapacity();
+            const delay = Math.random() * loadCapacity;
+            const chargeDelta = 2
+                * (delay / loadCapacity)
+                * telemetry_updater_service_1.TelemetryUpdaterService.getChargeDeltaForSecond(await drone.getBatteryPower());
             drone.status = drone_state_service_1.DroneStatus.TAKING_CARGO;
+            console.log(`Loading ${delay} weight...`);
             const timeout = setTimeout(async () => {
                 drone.load = delay;
-                drone.batteryCharge -= await drone.getBatteryCharge() - chargeDelta;
+                drone.batteryCharge = await drone.getBatteryCharge() - chargeDelta;
                 drone.status = drone_state_service_1.DroneStatus.WAITING;
+                this.cancel(order);
+                console.log('Loaded.');
                 resolve(index_1.DroneOrderStatus.DONE);
-                this._orders.delete(order);
             }, delay);
             this._orders.set(order, timeout);
         });

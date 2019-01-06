@@ -87,7 +87,7 @@ export class InMemoryDroneState extends EventEmitter implements IDroneState {
   }
 
   set status(value: DroneStatus) {
-    if (typeof value === 'number' && DroneStatus[value]) {
+    if (typeof value !== 'number' || !DroneStatus[value]) {
       throw new TypeError(`Bad status value ${value}`);
     }
     this._status = value;
@@ -230,6 +230,7 @@ export class InMemoryDroneState extends EventEmitter implements IDroneState {
       latitude: this._latitude,
       longitude: this._longitude,
       batteryCharge: this._batteryCharge,
+      load: this._load,
     });
     try {
       await fs.writeFile(this._snapshotPath, serializedSnapshot);
